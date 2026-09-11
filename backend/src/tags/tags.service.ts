@@ -44,23 +44,31 @@ export class TagsService {
     }
 
     /**
-     * Colour is derived rather than chosen. The key sets the hue family, so
-     * every site: tag reads as related, and the value shifts hue and lightness
-     * enough that sibling values stay apart: a fleet with three sites whose
-     * chips are the same colour defeats the point of having chips.
+     * Colour is assigned, not hashed from the name.
+     *
+     * Hashing the value was the obvious approach and it does not work: two
+     * values of one key land on the same colour, or a pair of colours two bytes
+     * apart, long before the key runs out of realistic values. No hash can
+     * promise that distinct inputs land far apart.
+     *
+     * So the key fixes the hue family and each new value of that key takes the
+     * next slot in a ladder. The stride walks the band in large jumps, so the
+     * values created first — the ones actually on screen together — are the
+     * furthest apart, and lightness alternates on top of that.
      *
      * Mirrored in deploy/autotag-hosts.py, which writes tags straight to the
      * database. Change one, change the other.
      */
-    private colorFor(key: string, value: string) {
+    private colorFor(key: string, slot: number) {
         const hash = (s: string) => {
             let h = 0;
             for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
             return Math.abs(h);
         };
-        const v = hash(value);
-        const hue = (hash(key) + (v % 9) * 4) % 360;
-        const light = 50 + (v % 5) * 7;
+        // 47 and 61 are coprime, so the offsets do not repeat until the 61st
+        // value of a key, which no realistic key reaches.
+        const hue = (hash(key) + ((slot * 47) % 61) - 30 + 360) % 360;
+        const light = 55 + (slot % 3) * 9;
         return hslToHex(hue, 62, light);
     }
 
@@ -81,9 +89,15 @@ export class TagsService {
                 ids.push(existing.rows[0].id);
                 continue;
             }
+            // The slot is how many values this key already has, so each new one
+            // lands on a colour none of its siblings is using.
+            const used = await this.db.query(
+                'SELECT count(*)::int AS n FROM tags WHERE user_id = $1 AND key = $2',
+                [userId, key],
+            );
             const created = await this.db.query(
                 'INSERT INTO tags (user_id, key, value, color) VALUES ($1, $2, $3, $4) RETURNING id',
-                [userId, key, value, this.colorFor(key, value)],
+                [userId, key, value, this.colorFor(key, used.rows[0].n)],
             );
             ids.push(created.rows[0].id);
         }

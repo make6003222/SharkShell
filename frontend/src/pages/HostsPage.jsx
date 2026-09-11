@@ -338,6 +338,12 @@ export default function HostsPage() {
                                     {host.key_name && <span className="host-key-name">{host.key_name}</span>}
                                     {host.has_password && <span className="badge badge-success" style={{ fontSize: 10 }}>Saved</span>}
                                 </div>
+                                <div className="host-card-actions">
+                                    <button className="btn btn-primary btn-sm" onClick={() => createSession(null, host)}>Connect</button>
+                                    <button className="btn btn-ghost btn-sm" onClick={() => openEdit(host)}>Edit</button>
+                                    <button className="btn btn-ghost btn-sm" onClick={() => openDuplicate(host)} title="Create another host with these settings">Duplicate</button>
+                                    <button className="btn btn-danger btn-sm" onClick={() => setDeleteConfirmId(host.id)}>Delete</button>
+                                </div>
                                 {(host.tags || []).length > 0 && (
                                     <div className="host-card-tags">
                                         {host.tags.map(t => (
@@ -354,12 +360,6 @@ export default function HostsPage() {
                                         ))}
                                     </div>
                                 )}
-                                <div className="host-card-actions">
-                                    <button className="btn btn-primary btn-sm" onClick={() => createSession(null, host)}>Connect</button>
-                                    <button className="btn btn-ghost btn-sm" onClick={() => openEdit(host)}>Edit</button>
-                                    <button className="btn btn-ghost btn-sm" onClick={() => openDuplicate(host)} title="Create another host with these settings">Duplicate</button>
-                                    <button className="btn btn-danger btn-sm" onClick={() => setDeleteConfirmId(host.id)}>Delete</button>
-                                </div>
                             </div>
                         );
                     })}

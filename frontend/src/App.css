@@ -2823,11 +2823,16 @@ a.stat-card {
     font-variant-numeric: tabular-nums;
 }
 
+/* Подвал карточки. Теги стоят ПОД кнопками и отделены чертой: рядом с
+   Connect они читались как продолжение панели действий и норовили поймать
+   случайный клик. */
 .host-card-tags {
     display: flex;
     flex-wrap: wrap;
     gap: 4px;
-    margin-top: 8px;
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border-subtle);
 }
 
 .host-card-select {

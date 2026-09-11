@@ -12,6 +12,7 @@ export default function HostsPage() {
     const [loading, setLoading] = useState(true);
     const [showAdd, setShowAdd] = useState(false);
     const [editHost, setEditHost] = useState(null);
+    const [duplicateSource, setDuplicateSource] = useState(null); // хост, с которого копируем
     const [submitting, setSubmitting] = useState(false);
     const [toast, setToast] = useState(null);
     const [deleteConfirmId, setDeleteConfirmId] = useState(null);
@@ -55,12 +56,34 @@ export default function HostsPage() {
     function openAdd() {
         setForm({ name: '', hostname: '', port: '22', username: '', authType: 'key', sshKeyId: '', password: '', groupId: '' });
         setEditHost(null);
+        setDuplicateSource(null);
         setShowAdd(true);
     }
 
     function openEdit(host) {
         setForm({ name: host.name, hostname: host.hostname, port: String(host.port), username: host.username, authType: host.auth_type, sshKeyId: host.ssh_key_id || '', password: '', groupId: host.group_id || '' });
         setEditHost(host);
+        setDuplicateSource(null);
+        setShowAdd(true);
+    }
+
+    // Copying a host keeps everything that is usually identical across a set
+    // of machines and clears only the field that cannot be: the address. The
+    // password never travels through the browser to get here - the server
+    // copies the stored one unless a new one is typed in the form.
+    function openDuplicate(host) {
+        setForm({
+            name: `${host.name} copy`,
+            hostname: '',
+            port: String(host.port),
+            username: host.username,
+            authType: host.auth_type,
+            sshKeyId: host.ssh_key_id || '',
+            password: '',
+            groupId: host.group_id || '',
+        });
+        setEditHost(null);
+        setDuplicateSource(host);
         setShowAdd(true);
     }
 
@@ -68,14 +91,17 @@ export default function HostsPage() {
         e.preventDefault();
         setSubmitting(true);
         try {
-            const url = apiUrl(editHost ? `/api/hosts/${editHost.id}` : '/api/hosts');
+            const url = apiUrl(
+                editHost ? `/api/hosts/${editHost.id}`
+                    : duplicateSource ? `/api/hosts/${duplicateSource.id}/duplicate`
+                        : '/api/hosts');
             const method = editHost ? 'PUT' : 'POST';
             const res = await fetch(url, {
                 method,
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
                 body: JSON.stringify({ name: form.name, hostname: form.hostname, port: parseInt(form.port) || 22, username: form.username, authType: form.authType, sshKeyId: form.sshKeyId || null, password: form.password || undefined, groupId: form.groupId || null }),
             });
-            if (res.ok) { showToast(editHost ? 'Host updated!' : 'Host added!'); setShowAdd(false); fetchHosts(); }
+            if (res.ok) { showToast(editHost ? 'Host updated!' : duplicateSource ? 'Host copied!' : 'Host added!'); setShowAdd(false); fetchHosts(); }
             else { const data = await res.json(); showToast(data.error || 'Failed', 'error'); }
         } catch (err) { showToast(err.message, 'error'); }
         finally { setSubmitting(false); }
@@ -210,6 +236,7 @@ export default function HostsPage() {
                                 <div className="host-card-actions">
                                     <button className="btn btn-primary btn-sm" onClick={() => createSession(null, host)}>Connect</button>
                                     <button className="btn btn-ghost btn-sm" onClick={() => openEdit(host)}>Edit</button>
+                                    <button className="btn btn-ghost btn-sm" onClick={() => openDuplicate(host)} title="Create another host with these settings">Duplicate</button>
                                     <button className="btn btn-danger btn-sm" onClick={() => setDeleteConfirmId(host.id)}>Delete</button>
                                 </div>
                             </div>
@@ -222,7 +249,15 @@ export default function HostsPage() {
             {showAdd && (
                 <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setShowAdd(false)}>
                     <div className="modal">
-                        <h2>{editHost ? 'Edit Host' : 'Add Host'}</h2>
+                        <h2>{editHost ? 'Edit Host' : duplicateSource ? 'Duplicate Host' : 'Add Host'}</h2>
+                        {duplicateSource && (
+                            <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginBottom: 16 }}>
+                                Copied from <strong>{duplicateSource.name}</strong>. Give it an address;
+                                {duplicateSource.has_password
+                                    ? ' the stored password comes across unless you set a new one below.'
+                                    : ' everything else is carried over.'}
+                            </p>
+                        )}
                         <form onSubmit={handleSubmit}>
                             <div className="input-group" style={{ marginBottom: 14 }}><label>Name</label><input className="input-field" placeholder="My Server" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required /></div>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px', gap: 12, marginBottom: 14 }}>

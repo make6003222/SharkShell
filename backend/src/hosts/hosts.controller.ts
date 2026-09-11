@@ -26,6 +26,22 @@ export class HostsController {
         return res.status(201).json({ host });
     }
 
+    // Copying a host server-side keeps the stored password out of the browser:
+    // the encrypted blob is carried over as it is, and the client only ever
+    // sends the handful of fields that actually differ.
+    @Post(':id/duplicate')
+    async duplicate(@Req() req: any, @Param('id') id: string, @Body() body: any, @Res() res: Response) {
+        const { name, hostname } = body;
+        if (!name || !hostname) {
+            return res.status(400).json({ error: 'Name and hostname are required' });
+        }
+        const host = await this.hostsService.duplicate(req.user.id, id, body);
+        if (!host) {
+            return res.status(404).json({ error: 'Host not found' });
+        }
+        return res.status(201).json({ host });
+    }
+
     @Put(':id')
     async update(@Req() req: any, @Param('id') id: string, @Body() body: any, @Res() res: Response) {
         const host = await this.hostsService.update(req.user.id, id, body);

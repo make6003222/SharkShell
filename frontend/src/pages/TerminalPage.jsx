@@ -2,6 +2,11 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useTerminal } from '../context/TerminalContext';
 import { apiUrl } from '../api';
+import HostStatusBar from '../components/HostStatusBar';
+// Bundled with the app rather than pulled from a public CDN at runtime, so the
+// terminal styles load on hosts with no outbound internet access and no third
+// party sits in the request path of the admin interface.
+import '@xterm/xterm/css/xterm.css';
 
 export default function TerminalPage() {
     const { token } = useAuth();
@@ -9,7 +14,7 @@ export default function TerminalPage() {
         workspaces, activeWorkspaceId, activeSessionId,
         activeWorkspace, setActiveSessionId,
         createSession, closeSession, connectGroup, getSessionRefs,
-        reconnectSession,
+        reconnectSession, sessionStats,
         passphrasePrompt, submitPassphrase, cancelPassphrase,
     } = useTerminal();
     const [passphraseInput, setPassphraseInput] = useState('');
@@ -65,6 +70,7 @@ export default function TerminalPage() {
     }
 
     const sessions = activeWorkspace?.sessions || [];
+    const activeSession = sessions.find(s => s.id === activeSessionId) || null;
     const statusColors = { connecting: 'var(--warning)', connected: 'var(--success)', disconnected: 'var(--danger)', saved: 'var(--text-tertiary)' };
 
     // Collect ALL sessions from ALL workspaces for persistent rendering
@@ -72,8 +78,6 @@ export default function TerminalPage() {
 
     return (
         <div className="terminal-page">
-            <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5/css/xterm.min.css" />
-
             {/* Tab Bar */}
             <div className="terminal-tab-bar glass-card">
                 <div className="terminal-tabs-scroll">
@@ -163,6 +167,14 @@ export default function TerminalPage() {
                     />
                 ))}
             </div>
+
+            {/* Resource readout for whichever host the visible tab is attached to */}
+            {activeSession && (
+                <HostStatusBar
+                    stats={sessionStats[activeSession.id]}
+                    status={activeSession.status}
+                />
+            )}
 
             {/* Passphrase Prompt Modal */}
             {passphrasePrompt && (

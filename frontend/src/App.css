@@ -2630,3 +2630,94 @@ a.stat-card {
 .settings-field { display: flex; gap: 16px; padding: 12px 4px; border-top: 1px solid var(--border-subtle); font-size: 14px; }
 .settings-field:first-child { border-top: none; }
 .settings-field-label { color: var(--text-tertiary); width: 130px; flex-shrink: 0; }
+
+/* ── Host Status Bar ──────────────────────────────────────────────────────
+   Resource readout under the terminal for the host of the visible tab.
+   Values come from the session socket; see components/HostStatusBar.jsx.     */
+
+.host-status-bar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px 18px;
+    margin-top: 8px;
+    padding: 6px 12px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-md);
+    font-size: 11.5px;
+    line-height: 1.4;
+    font-variant-numeric: tabular-nums;
+    overflow-x: auto;
+}
+
+.hsb-metric {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+.hsb-right {
+    margin-left: auto;
+}
+
+.hsb-label {
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 10px;
+    font-weight: 600;
+}
+
+.hsb-value {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.hsb-muted {
+    color: var(--text-tertiary);
+}
+
+.hsb-net {
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.hsb-bar {
+    display: inline-block;
+    width: 46px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--bg-input);
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.hsb-bar-fill {
+    display: block;
+    height: 100%;
+    border-radius: 2px;
+    transition: width var(--transition-base), background var(--transition-base);
+}
+
+.hsb-idle {
+    color: var(--text-tertiary);
+    font-style: italic;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .hsb-bar-fill {
+        transition: none;
+    }
+}
+
+@media (max-width: 640px) {
+    .host-status-bar {
+        gap: 4px 12px;
+    }
+
+    .hsb-right {
+        margin-left: 0;
+    }
+}

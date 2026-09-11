@@ -106,6 +106,7 @@ export function TerminalProvider({ children }) {
     const [activeWorkspaceId, setActiveWorkspaceId] = useState('ws-default');
     const [activeSessionId, setActiveSessionId] = useState(null);
     const [passphrasePrompt, setPassphrasePrompt] = useState(null); // { sessionId, hostId }
+    const [sessionStats, setSessionStats] = useState({}); // sessionId -> host resource readout
 
     // Refs to hold live socket/term objects (not in React state to avoid re-renders)
     const sessionRefs = useRef({}); // { [sessionId]: { socket, term, fitAddon, resizeObserver } }
@@ -285,6 +286,10 @@ export function TerminalProvider({ children }) {
 
             socket.on('ssh:data', (data) => { term.write(data); });
 
+            socket.on('ssh:stats', (m) => {
+                setSessionStats(prev => ({ ...prev, [sessionId]: m }));
+            });
+
             socket.on('ssh:passphrase-needed', (data) => {
                 clearWatchdog();
                 term.writeln(`\r\n\x1b[33m🔑 Passphrase required for this key\x1b[0m\r\n`);
@@ -322,11 +327,24 @@ export function TerminalProvider({ children }) {
             ...w,
             sessions: w.sessions.map(s => s.id === sessionId ? { ...s, status } : s),
         })));
+        // Numbers from a session that is no longer up are misleading, so drop
+        // them rather than leaving the bar frozen on the last reading.
+        if (status !== 'connected') dropSessionStats(sessionId);
+    }
+
+    function dropSessionStats(sessionId) {
+        setSessionStats(prev => {
+            if (!(sessionId in prev)) return prev;
+            const next = { ...prev };
+            delete next[sessionId];
+            return next;
+        });
     }
 
     function closeSession(sessionId) {
         destroySessionRefs(sessionId);
         clearScrollback(sessionId);
+        dropSessionStats(sessionId);
         setWorkspaces(prev => prev.map(w => ({
             ...w,
             sessions: w.sessions.filter(s => s.id !== sessionId),
@@ -405,6 +423,7 @@ export function TerminalProvider({ children }) {
             deleteWorkspace,
             createSession,
             closeSession,
+            sessionStats,
             switchSession,
             connectGroup,
             getSessionRefs,

@@ -9,6 +9,7 @@ import { AuthService } from '../auth/auth.service';
 import { DatabaseService } from '../database/database.service';
 import { CryptoService } from '../crypto/crypto.service';
 import { Client } from 'ssh2';
+import { HostMetricsCollector } from './host-metrics.service';
 
 @WebSocketGateway({
     path: '/api/socket',
@@ -21,7 +22,11 @@ export class SshGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @WebSocketServer()
     server: Server;
 
-    private clients = new Map<string, { sshClient: Client | null; sshStream: any }>();
+    private clients = new Map<string, {
+        sshClient: Client | null;
+        sshStream: any;
+        metrics?: HostMetricsCollector | null;
+    }>();
 
     constructor(
         private authService: AuthService,
@@ -70,6 +75,7 @@ export class SshGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     handleDisconnect(socket: Socket) {
         console.log(`  🔌 Client disconnected: ${socket.id}`);
+        this.stopMetrics(socket.id);
         const clientData = this.clients.get(socket.id);
         if (clientData) {
             if (clientData.sshStream) clientData.sshStream.close();
@@ -101,6 +107,7 @@ export class SshGateway implements OnGatewayConnection, OnGatewayDisconnect {
                 username: host.username,
                 readyTimeout: 20000,
                 keepaliveInterval: 10000,
+                tryKeyboard: true,
             };
 
             // Auth: key-based or password
@@ -157,6 +164,14 @@ export class SshGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
                         if (clientData) {
                             clientData.sshStream = stream;
+
+                            // Resource readout for the status bar. Runs on its own exec
+                            // channel, so it never writes into the interactive shell.
+                            clientData.metrics = new HostMetricsCollector(
+                                sshClient,
+                                (m) => socket.emit('ssh:stats', m),
+                            );
+                            clientData.metrics.start();
                         }
 
                         stream.on('data', (chunk) => {
@@ -168,6 +183,7 @@ export class SshGateway implements OnGatewayConnection, OnGatewayDisconnect {
                         });
 
                         stream.on('close', () => {
+                            this.stopMetrics(socket.id);
                             socket.emit('ssh:closed', { message: 'Session ended' });
                             if (sshClient) sshClient.end();
                         });
@@ -176,12 +192,27 @@ export class SshGateway implements OnGatewayConnection, OnGatewayDisconnect {
             });
 
             sshClient.on('error', (err) => {
+                this.stopMetrics(socket.id);
                 console.error('SSH connection error:', err.message);
                 socket.emit('ssh:error', { message: 'Connection failed: ' + err.message });
             });
 
             sshClient.on('close', () => {
+                this.stopMetrics(socket.id);
                 socket.emit('ssh:closed', { message: 'Connection closed' });
+            });
+
+            // Many PAM-backed servers (AlmaLinux, RHEL and friends) offer only
+            // "publickey,keyboard-interactive" and no "password" method at all.
+            // Without this, a correct password fails with "All configured
+            // authentication methods failed", while OpenSSH on the command line
+            // connects fine because it falls back to keyboard-interactive itself.
+            sshClient.on('keyboard-interactive', (name, instructions, lang, prompts, finish) => {
+                if (!connConfig.password) {
+                    finish([]);
+                    return;
+                }
+                finish(prompts.map((p: any) => (/password/i.test(p.prompt || '') ? connConfig.password : '')));
             });
 
             sshClient.connect(connConfig);
@@ -212,10 +243,20 @@ export class SshGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     private handleSshDisconnect(socket: Socket) {
+        this.stopMetrics(socket.id);
         const clientData = this.clients.get(socket.id);
         if (clientData) {
             if (clientData.sshStream) clientData.sshStream.close();
             if (clientData.sshClient) clientData.sshClient.end();
+        }
+    }
+
+    /** Kills the metrics poller so its interval cannot outlive the session. */
+    private stopMetrics(socketId: string) {
+        const clientData = this.clients.get(socketId);
+        if (clientData?.metrics) {
+            clientData.metrics.stop();
+            clientData.metrics = null;
         }
     }
 }

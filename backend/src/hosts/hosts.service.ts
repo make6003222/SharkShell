@@ -13,7 +13,13 @@ export class HostsService {
         const result = await this.db.query(
             `SELECT h.id, h.name, h.hostname, h.port, h.username, h.auth_type, h.ssh_key_id,
               h.created_at, h.group_id, sk.name as key_name, g.name as group_name, g.color as group_color,
-              CASE WHEN h.password_encrypted IS NOT NULL THEN true ELSE false END as has_password
+              CASE WHEN h.password_encrypted IS NOT NULL THEN true ELSE false END as has_password,
+              COALESCE((
+                SELECT json_agg(json_build_object('id', t.id, 'key', t.key, 'value', t.value, 'color', t.color)
+                                ORDER BY t.key, t.value)
+                  FROM host_tags ht JOIN tags t ON t.id = ht.tag_id
+                 WHERE ht.host_id = h.id
+              ), '[]'::json) AS tags
        FROM hosts h
        LEFT JOIN ssh_keys sk ON h.ssh_key_id = sk.id
        LEFT JOIN groups g ON h.group_id = g.id

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import TagFilterBar, { hostMatchesTags } from '../components/TagFilterBar';
 import { useAuth } from '../context/AuthContext';
 import { useTerminal } from '../context/TerminalContext';
 import { apiUrl } from '../api';
@@ -13,6 +14,10 @@ export default function HostsPage() {
     const [showAdd, setShowAdd] = useState(false);
     const [editHost, setEditHost] = useState(null);
     const [duplicateSource, setDuplicateSource] = useState(null); // хост, с которого копируем
+    const [tags, setTags] = useState([]);
+    const [tagFilter, setTagFilter] = useState(() => new Set());
+    const [selectedHosts, setSelectedHosts] = useState(() => new Set());
+    const [bulkTagInput, setBulkTagInput] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [toast, setToast] = useState(null);
     const [deleteConfirmId, setDeleteConfirmId] = useState(null);
@@ -22,12 +27,12 @@ export default function HostsPage() {
     const [groupForm, setGroupForm] = useState({ name: '', color: '#6366f1' });
     const [groupSubmitting, setGroupSubmitting] = useState(false);
     const [deleteGroupId, setDeleteGroupId] = useState(null);
-    const [form, setForm] = useState({ name: '', hostname: '', port: '22', username: '', authType: 'key', sshKeyId: '', password: '', groupId: '' });
+    const [form, setForm] = useState({ name: '', hostname: '', port: '22', username: '', authType: 'key', sshKeyId: '', password: '', groupId: '', tags: '' });
 
     const GROUP_COLORS = ['#6366f1', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#8b5cf6', '#14b8a6'];
 
     useEffect(() => {
-        if (token) { fetchHosts(); fetchKeys(); fetchGroups(); }
+        if (token) { fetchHosts(); fetchKeys(); fetchGroups(); fetchTags(); }
     }, [token]);
 
     async function fetchHosts() {
@@ -44,6 +49,66 @@ export default function HostsPage() {
         } catch { }
     }
 
+    async function fetchTags() {
+        try {
+            const res = await fetch(apiUrl('/api/tags'), { headers: { Authorization: `Bearer ${token}` } });
+            if (res.ok) { const data = await res.json(); setTags(data.tags || []); }
+        } catch { }
+    }
+
+    // Tags are stored separately from the host row, so saving a host is two
+    // calls. Failing to tag is worth a warning but must not read as the host
+    // itself having failed to save.
+    async function saveTags(hostId, raw) {
+        const list = String(raw || '').split(/[\s,]+/).map(t => t.trim()).filter(Boolean);
+        try {
+            await fetch(apiUrl(`/api/hosts/${hostId}/tags`), {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ tags: list }),
+            });
+        } catch { showToast('Host saved, but tags did not apply', 'error'); }
+    }
+
+    function toggleTagFilter(full) {
+        setTagFilter(prev => {
+            const next = new Set(prev);
+            if (next.has(full)) next.delete(full); else next.add(full);
+            return next;
+        });
+    }
+
+    function toggleHostSelected(id) {
+        setSelectedHosts(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id); else next.add(id);
+            return next;
+        });
+    }
+
+    async function applyBulkTags(mode) {
+        const list = bulkTagInput.split(/[\s,]+/).map(t => t.trim()).filter(Boolean);
+        if (list.length === 0 || selectedHosts.size === 0) return;
+        try {
+            const res = await fetch(apiUrl('/api/tags/bulk'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({
+                    hostIds: [...selectedHosts],
+                    add: mode === 'add' ? list : [],
+                    remove: mode === 'remove' ? list : [],
+                }),
+            });
+            if (res.ok) {
+                const data = await res.json();
+                showToast(`${mode === 'add' ? 'Tagged' : 'Untagged'} ${data.updated} host${data.updated === 1 ? '' : 's'}`);
+                setBulkTagInput('');
+                setSelectedHosts(new Set());
+                fetchHosts(); fetchTags();
+            } else { showToast('Bulk tagging failed', 'error'); }
+        } catch (err) { showToast(err.message, 'error'); }
+    }
+
     async function fetchGroups() {
         try {
             const res = await fetch(apiUrl('/api/groups?type=host'), { headers: { Authorization: `Bearer ${token}` } });
@@ -54,14 +119,14 @@ export default function HostsPage() {
     function showToast(msg, type = 'success') { setToast({ msg, type }); setTimeout(() => setToast(null), 3000); }
 
     function openAdd() {
-        setForm({ name: '', hostname: '', port: '22', username: '', authType: 'key', sshKeyId: '', password: '', groupId: '' });
+        setForm({ name: '', hostname: '', port: '22', username: '', authType: 'key', sshKeyId: '', password: '', groupId: '', tags: '' });
         setEditHost(null);
         setDuplicateSource(null);
         setShowAdd(true);
     }
 
     function openEdit(host) {
-        setForm({ name: host.name, hostname: host.hostname, port: String(host.port), username: host.username, authType: host.auth_type, sshKeyId: host.ssh_key_id || '', password: '', groupId: host.group_id || '' });
+        setForm({ name: host.name, hostname: host.hostname, port: String(host.port), username: host.username, authType: host.auth_type, sshKeyId: host.ssh_key_id || '', password: '', groupId: host.group_id || '', tags: (host.tags || []).map(t => `${t.key}:${t.value}`).join(' ') });
         setEditHost(host);
         setDuplicateSource(null);
         setShowAdd(true);
@@ -81,6 +146,7 @@ export default function HostsPage() {
             sshKeyId: host.ssh_key_id || '',
             password: '',
             groupId: host.group_id || '',
+            tags: (host.tags || []).map(t => `${t.key}:${t.value}`).join(' '),
         });
         setEditHost(null);
         setDuplicateSource(host);
@@ -101,7 +167,14 @@ export default function HostsPage() {
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
                 body: JSON.stringify({ name: form.name, hostname: form.hostname, port: parseInt(form.port) || 22, username: form.username, authType: form.authType, sshKeyId: form.sshKeyId || null, password: form.password || undefined, groupId: form.groupId || null }),
             });
-            if (res.ok) { showToast(editHost ? 'Host updated!' : duplicateSource ? 'Host copied!' : 'Host added!'); setShowAdd(false); fetchHosts(); }
+            if (res.ok) {
+                const saved = await res.json().catch(() => ({}));
+                const hostId = saved?.host?.id || editHost?.id;
+                if (hostId) await saveTags(hostId, form.tags);
+                showToast(editHost ? 'Host updated!' : duplicateSource ? 'Host copied!' : 'Host added!');
+                setShowAdd(false);
+                fetchHosts(); fetchTags();
+            }
             else { const data = await res.json(); showToast(data.error || 'Failed', 'error'); }
         } catch (err) { showToast(err.message, 'error'); }
         finally { setSubmitting(false); }
@@ -153,7 +226,8 @@ export default function HostsPage() {
         } catch (err) { showToast(err.message, 'error'); }
     }
 
-    const filteredHosts = selectedGroup === 'all' ? hosts : selectedGroup === 'ungrouped' ? hosts.filter(h => !h.group_id) : hosts.filter(h => h.group_id === selectedGroup);
+    const byGroup = selectedGroup === 'all' ? hosts : selectedGroup === 'ungrouped' ? hosts.filter(h => !h.group_id) : hosts.filter(h => h.group_id === selectedGroup);
+    const filteredHosts = byGroup.filter(h => hostMatchesTags(h, tagFilter));
 
     return (
         <div>
@@ -195,6 +269,30 @@ export default function HostsPage() {
                 </div>
             )}
 
+            <TagFilterBar
+                tags={tags}
+                selected={tagFilter}
+                onToggle={toggleTagFilter}
+                onClear={() => setTagFilter(new Set())}
+                matchCount={filteredHosts.length}
+            />
+
+            {selectedHosts.size > 0 && (
+                <div className="bulk-tag-bar">
+                    <span className="bulk-tag-count">{selectedHosts.size} selected</span>
+                    <input
+                        className="input-field bulk-tag-input"
+                        placeholder="site:almaty role:auth"
+                        value={bulkTagInput}
+                        onChange={e => setBulkTagInput(e.target.value)}
+                    />
+                    <button className="btn btn-primary btn-sm" disabled={!bulkTagInput.trim()} onClick={() => applyBulkTags('add')}>Add tags</button>
+                    <button className="btn btn-ghost btn-sm" disabled={!bulkTagInput.trim()} onClick={() => applyBulkTags('remove')}>Remove tags</button>
+                    <button className="btn btn-ghost btn-sm" onClick={() => { filteredHosts.filter(h => selectedHosts.has(h.id)).forEach(h => createSession(null, h)); }}>Connect all</button>
+                    <button className="btn btn-ghost btn-sm" onClick={() => setSelectedHosts(new Set())}>Clear</button>
+                </div>
+            )}
+
             {loading ? (
                 <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}><div className="spinner spinner-lg" /></div>
             ) : filteredHosts.length === 0 ? (
@@ -223,16 +321,39 @@ export default function HostsPage() {
                                     <div className="host-card-icon">
                                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="2" width="20" height="8" rx="2" ry="2" /><rect x="2" y="14" width="20" height="8" rx="2" ry="2" /><line x1="6" y1="6" x2="6.01" y2="6" /><line x1="6" y1="18" x2="6.01" y2="18" /></svg>
                                     </div>
-                                    <div>
+                                    <div style={{ flex: 1, minWidth: 0 }}>
                                         <h3 className="host-card-name">{host.name}</h3>
                                         <span className="host-card-addr">{host.username}@{host.hostname}:{host.port}</span>
                                     </div>
+                                    <input
+                                        type="checkbox"
+                                        className="host-card-select"
+                                        checked={selectedHosts.has(host.id)}
+                                        onChange={() => toggleHostSelected(host.id)}
+                                        title="Select for bulk tagging"
+                                    />
                                 </div>
                                 <div className="host-card-meta">
                                     <span className={`badge ${host.auth_type === 'key' ? 'badge-info' : 'badge-warning'}`}>{host.auth_type === 'key' ? '🔑 Key Auth' : '🔒 Password'}</span>
                                     {host.key_name && <span className="host-key-name">{host.key_name}</span>}
                                     {host.has_password && <span className="badge badge-success" style={{ fontSize: 10 }}>Saved</span>}
                                 </div>
+                                {(host.tags || []).length > 0 && (
+                                    <div className="host-card-tags">
+                                        {host.tags.map(t => (
+                                            <button
+                                                key={t.id}
+                                                type="button"
+                                                className="tag-chip tag-chip-sm"
+                                                style={{ borderColor: t.color, color: t.color }}
+                                                onClick={() => toggleTagFilter(`${t.key}:${t.value}`)}
+                                                title={`Filter by ${t.key}:${t.value}`}
+                                            >
+                                                <span className="tag-chip-key">{t.key}</span>{t.value}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
                                 <div className="host-card-actions">
                                     <button className="btn btn-primary btn-sm" onClick={() => createSession(null, host)}>Connect</button>
                                     <button className="btn btn-ghost btn-sm" onClick={() => openEdit(host)}>Edit</button>
@@ -292,6 +413,24 @@ export default function HostsPage() {
                                     <option value="">No group</option>
                                     {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
                                 </select>
+                            </div>
+
+                            <div className="input-group" style={{ marginBottom: 14 }}>
+                                <label>Tags</label>
+                                <input
+                                    className="input-field"
+                                    placeholder="site:almaty role:auth zone:ns.telecom.kz"
+                                    value={form.tags}
+                                    onChange={e => setForm({ ...form, tags: e.target.value })}
+                                    list="known-tags"
+                                />
+                                <datalist id="known-tags">
+                                    {tags.map(t => <option key={t.id} value={`${t.key}:${t.value}`} />)}
+                                </datalist>
+                                <span className="input-hint">
+                                    Space separated, written as key:value. The group says where a host lives;
+                                    tags say how you find it, and a host can carry as many as it needs.
+                                </span>
                             </div>
                             <div className="modal-actions">
                                 <button type="button" className="btn btn-ghost" onClick={() => setShowAdd(false)}>Cancel</button>

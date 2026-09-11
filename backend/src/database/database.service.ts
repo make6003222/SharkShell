@@ -94,6 +94,33 @@ export class DatabaseService implements OnModuleDestroy {
       )
     `);
 
+    // ─── Host tags: the cross-cutting axis that a single group_id cannot express ───
+    // A host sits in exactly one group, the way a Proxmox guest sits in one pool,
+    // and carries any number of tags. Tags are key/value so that four dimensions
+    // (site, role, exposure, served zone) stay legible instead of collapsing into
+    // one hyphenated string.
+
+    await this.query(`
+      CREATE TABLE IF NOT EXISTS tags (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        key VARCHAR(64) NOT NULL,
+        value VARCHAR(128) NOT NULL,
+        color VARCHAR(7) DEFAULT '#6366f1',
+        created_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE (user_id, key, value)
+      )
+    `);
+
+    await this.query(`
+      CREATE TABLE IF NOT EXISTS host_tags (
+        host_id UUID NOT NULL REFERENCES hosts(id) ON DELETE CASCADE,
+        tag_id UUID NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+        PRIMARY KEY (host_id, tag_id)
+      )
+    `);
+
+    await this.query('CREATE INDEX IF NOT EXISTS host_tags_tag_idx ON host_tags(tag_id)');
     await this.query(`
       CREATE TABLE IF NOT EXISTS mcp_tokens (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

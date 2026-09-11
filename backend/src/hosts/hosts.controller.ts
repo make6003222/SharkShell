@@ -4,11 +4,15 @@ import {
 import { Response } from 'express';
 import { AuthGuard } from '../auth/auth.guard';
 import { HostsService } from './hosts.service';
+import { TagsService } from '../tags/tags.service';
 
 @Controller('hosts')
 @UseGuards(AuthGuard)
 export class HostsController {
-    constructor(private hostsService: HostsService) { }
+    constructor(
+        private hostsService: HostsService,
+        private tagsService: TagsService,
+    ) { }
 
     @Get()
     async findAll(@Req() req: any) {
@@ -49,6 +53,16 @@ export class HostsController {
             return res.status(404).json({ error: 'Host not found' });
         }
         return res.json({ host });
+    }
+
+    // Tags arrive as "key:value" strings and unknown ones are created on the
+    // spot, so the client never has to resolve an id before tagging anything.
+    @Put(':id/tags')
+    async setTags(@Req() req: any, @Param('id') id: string, @Body() body: any, @Res() res: Response) {
+        const tags = Array.isArray(body?.tags) ? body.tags : [];
+        const result = await this.tagsService.setHostTags(req.user.id, id, tags);
+        if (!result) return res.status(404).json({ error: 'Host not found' });
+        return res.json({ tags: result });
     }
 
     @Delete(':id')

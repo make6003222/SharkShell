@@ -7,6 +7,7 @@ import { HostsModule } from './hosts/hosts.module';
 import { KeysModule } from './keys/keys.module';
 import { SshModule } from './ssh/ssh.module';
 import { GroupsModule } from './groups/groups.module';
+import { TagsModule } from './tags/tags.module';
 import { McpModule } from './mcp/mcp.module';
 import { SettingsModule } from './settings/settings.module';
 import { MailModule } from './mail/mail.module';
@@ -24,6 +25,7 @@ import { SftpModule } from './sftp/sftp.module';
         KeysModule,
         SshModule,
         GroupsModule,
+        TagsModule,
         McpModule,
         OrgModule,
         SftpModule,

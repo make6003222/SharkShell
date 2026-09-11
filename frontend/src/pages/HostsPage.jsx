@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import TagFilterBar, { hostMatchesTags } from '../components/TagFilterBar';
+import TagFilterBar, { hostMatchesTags, tagChipStyle } from '../components/TagFilterBar';
 import { useAuth } from '../context/AuthContext';
 import { useTerminal } from '../context/TerminalContext';
 import { apiUrl } from '../api';
@@ -345,11 +345,11 @@ export default function HostsPage() {
                                                 key={t.id}
                                                 type="button"
                                                 className="tag-chip tag-chip-sm"
-                                                style={{ borderColor: t.color, color: t.color }}
+                                                style={tagChipStyle(t)}
                                                 onClick={() => toggleTagFilter(`${t.key}:${t.value}`)}
-                                                title={`Filter by ${t.key}:${t.value}`}
+                                                title={`${t.key}: ${t.value} — click to filter`}
                                             >
-                                                <span className="tag-chip-key">{t.key}</span>{t.value}
+                                                {t.value}
                                             </button>
                                         ))}
                                     </div>

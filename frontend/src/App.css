@@ -2795,22 +2795,21 @@ a.stat-card {
     font-variant-numeric: tabular-nums;
 }
 
+/* On a host card the tag is just its value in its own colour: the key lives in
+   the tooltip, and the colour family carries it visually. Five labelled chips
+   pushed the card to three lines and drowned out the host name. */
 .tag-chip-sm {
-    padding: 1px 7px;
+    padding: 0 7px;
     font-size: 10.5px;
+    line-height: 17px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
     cursor: pointer;
 }
 
-.tag-chip-key {
-    opacity: 0.6;
-    font-size: 9.5px;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-}
-
-.tag-chip-key::after {
-    content: ':';
-    margin: 0 2px 0 1px;
+.tag-chip-sm:hover {
+    filter: brightness(1.25);
+    background: inherit;
 }
 
 .tag-filter-summary {

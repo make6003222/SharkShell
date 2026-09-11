@@ -8,6 +8,24 @@
  * is the whole reason tags exist here.
  */
 
+/**
+ * A tag pill tinted with its own colour: filled faintly, outlined a little
+ * stronger, text at full strength. On a host card the key is left out and the
+ * colour carries it instead, because five "KEY: value" chips push the card to
+ * three lines and bury the host name they are supposed to describe.
+ */
+export function tagChipStyle(tag) {
+    const hex = /^#[0-9a-f]{6}$/i.test(tag.color || '') ? tag.color : '#6366f1';
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return {
+        background: `rgba(${r}, ${g}, ${b}, 0.14)`,
+        borderColor: `rgba(${r}, ${g}, ${b}, 0.45)`,
+        color: hex,
+    };
+}
+
 export function groupTagsByKey(tags) {
     const byKey = new Map();
     for (const t of tags) {
@@ -54,7 +72,7 @@ export default function TagFilterBar({ tags, selected, onToggle, onClear, matchC
                                     key={t.id}
                                     type="button"
                                     className={`tag-chip ${on ? 'tag-chip-on' : ''}`}
-                                    style={on ? { background: t.color, borderColor: t.color } : { borderColor: t.color, color: t.color }}
+                                    style={on ? { background: t.color, borderColor: t.color } : tagChipStyle(t)}
                                     onClick={() => onToggle(full)}
                                     title={`${full} — ${t.host_count} host${t.host_count === 1 ? '' : 's'}`}
                                 >

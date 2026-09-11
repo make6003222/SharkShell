@@ -2888,3 +2888,135 @@ a.stat-card {
         text-align: left;
     }
 }
+
+/* ── Tag editor ───────────────────────────────────────────────────────────
+   Пилюли с удалением плюс поле с подсказками из уже существующих тегов.
+   Одно текстовое поле со всеми тегами через пробел заставляло при правке
+   одного тега перенабирать остальные и никак не показывало, какие теги уже
+   заведены: так и появляются pavl и pavlodar как две разные площадки.      */
+
+.tag-editor {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 5px;
+    min-height: 38px;
+    padding: 6px 8px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+}
+
+.tag-chip-edit {
+    padding: 0 4px 0 8px;
+    font-size: 11px;
+    line-height: 19px;
+    font-weight: 600;
+    cursor: default;
+}
+
+.tag-chip-edit:hover {
+    background: inherit;
+}
+
+/* Тег, которого ещё нет в базе: цвет ему назначит сервер при сохранении,
+   поэтому здесь он намеренно нейтральный, а не выдуманный на клиенте. */
+.tag-chip-new {
+    border-style: dashed;
+    color: var(--text-secondary);
+}
+
+.tag-chip-remove {
+    margin-left: 4px;
+    padding: 0 3px;
+    font-size: 13px;
+    line-height: 1;
+    color: inherit;
+    background: transparent;
+    border: 0;
+    border-radius: 999px;
+    opacity: 0.55;
+    cursor: pointer;
+}
+
+.tag-chip-remove:hover,
+.tag-chip-remove:focus-visible {
+    opacity: 1;
+    background: rgba(255, 255, 255, 0.14);
+}
+
+.tag-editor-add {
+    width: 22px;
+    height: 22px;
+    display: grid;
+    place-items: center;
+    font-size: 15px;
+    line-height: 1;
+    color: var(--text-secondary);
+    background: transparent;
+    border: 1px dashed var(--border-light);
+    border-radius: 999px;
+    cursor: pointer;
+    transition: color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.tag-editor-add:hover,
+.tag-editor-add:focus-visible {
+    color: var(--accent-primary);
+    border-color: var(--accent-primary);
+}
+
+.tag-editor-box {
+    position: relative;
+    display: inline-flex;
+}
+
+.tag-editor-input {
+    width: 190px;
+    height: 24px;
+    padding: 0 8px;
+    font-size: 12px;
+    color: var(--text-primary);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--accent-primary);
+    border-radius: var(--radius-sm);
+    outline: none;
+}
+
+.tag-suggest {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    z-index: 30;
+    width: 230px;
+    max-height: 210px;
+    overflow-y: auto;
+    margin: 0;
+    padding: 4px;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-lg);
+}
+
+.tag-suggest-item {
+    width: 100%;
+    text-align: left;
+    padding: 2px 8px;
+    font-size: 11.5px;
+    line-height: 19px;
+    font-weight: 600;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    cursor: pointer;
+}
+
+.tag-suggest-on {
+    filter: brightness(1.3);
+    outline: 1px solid var(--accent-primary);
+    outline-offset: -1px;
+}

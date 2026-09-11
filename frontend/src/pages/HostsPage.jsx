@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import TagFilterBar, { hostMatchesTags, tagChipStyle } from '../components/TagFilterBar';
+import TagEditor from '../components/TagEditor';
 import { useAuth } from '../context/AuthContext';
 import { useTerminal } from '../context/TerminalContext';
 import { apiUrl } from '../api';
@@ -27,7 +28,7 @@ export default function HostsPage() {
     const [groupForm, setGroupForm] = useState({ name: '', color: '#6366f1' });
     const [groupSubmitting, setGroupSubmitting] = useState(false);
     const [deleteGroupId, setDeleteGroupId] = useState(null);
-    const [form, setForm] = useState({ name: '', hostname: '', port: '22', username: '', authType: 'key', sshKeyId: '', password: '', groupId: '', tags: '' });
+    const [form, setForm] = useState({ name: '', hostname: '', port: '22', username: '', authType: 'key', sshKeyId: '', password: '', groupId: '', tags: [] });
 
     const GROUP_COLORS = ['#6366f1', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#8b5cf6', '#14b8a6'];
 
@@ -60,7 +61,7 @@ export default function HostsPage() {
     // calls. Failing to tag is worth a warning but must not read as the host
     // itself having failed to save.
     async function saveTags(hostId, raw) {
-        const list = String(raw || '').split(/[\s,]+/).map(t => t.trim()).filter(Boolean);
+        const list = (Array.isArray(raw) ? raw : []).map(t => String(t).trim()).filter(Boolean);
         try {
             await fetch(apiUrl(`/api/hosts/${hostId}/tags`), {
                 method: 'PUT',
@@ -119,14 +120,14 @@ export default function HostsPage() {
     function showToast(msg, type = 'success') { setToast({ msg, type }); setTimeout(() => setToast(null), 3000); }
 
     function openAdd() {
-        setForm({ name: '', hostname: '', port: '22', username: '', authType: 'key', sshKeyId: '', password: '', groupId: '', tags: '' });
+        setForm({ name: '', hostname: '', port: '22', username: '', authType: 'key', sshKeyId: '', password: '', groupId: '', tags: [] });
         setEditHost(null);
         setDuplicateSource(null);
         setShowAdd(true);
     }
 
     function openEdit(host) {
-        setForm({ name: host.name, hostname: host.hostname, port: String(host.port), username: host.username, authType: host.auth_type, sshKeyId: host.ssh_key_id || '', password: '', groupId: host.group_id || '', tags: (host.tags || []).map(t => `${t.key}:${t.value}`).join(' ') });
+        setForm({ name: host.name, hostname: host.hostname, port: String(host.port), username: host.username, authType: host.auth_type, sshKeyId: host.ssh_key_id || '', password: '', groupId: host.group_id || '', tags: (host.tags || []).map(t => `${t.key}:${t.value}`) });
         setEditHost(host);
         setDuplicateSource(null);
         setShowAdd(true);
@@ -146,7 +147,7 @@ export default function HostsPage() {
             sshKeyId: host.ssh_key_id || '',
             password: '',
             groupId: host.group_id || '',
-            tags: (host.tags || []).map(t => `${t.key}:${t.value}`).join(' '),
+            tags: (host.tags || []).map(t => `${t.key}:${t.value}`),
         });
         setEditHost(null);
         setDuplicateSource(host);
@@ -417,19 +418,14 @@ export default function HostsPage() {
 
                             <div className="input-group" style={{ marginBottom: 14 }}>
                                 <label>Tags</label>
-                                <input
-                                    className="input-field"
-                                    placeholder="site:almaty role:auth zone:ns.telecom.kz"
+                                <TagEditor
                                     value={form.tags}
-                                    onChange={e => setForm({ ...form, tags: e.target.value })}
-                                    list="known-tags"
+                                    onChange={next => setForm({ ...form, tags: next })}
+                                    allTags={tags}
                                 />
-                                <datalist id="known-tags">
-                                    {tags.map(t => <option key={t.id} value={`${t.key}:${t.value}`} />)}
-                                </datalist>
                                 <span className="input-hint">
-                                    Space separated, written as key:value. The group says where a host lives;
-                                    tags say how you find it, and a host can carry as many as it needs.
+                                    Written as key:value. The group says where a host lives; tags say how
+                                    you find it, and a host can carry as many as it needs.
                                 </span>
                             </div>
                             <div className="modal-actions">

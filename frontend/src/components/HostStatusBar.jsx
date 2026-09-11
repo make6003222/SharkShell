@@ -85,7 +85,8 @@ export default function HostStatusBar({ stats, status }) {
         return (
             <div className="host-status-bar">
                 <span className="hsb-idle">
-                    Metrics unavailable on this host — it does not expose /proc.
+                    Metrics unavailable — this host reports neither /proc nor the
+                    sysctl counters the bar reads.
                 </span>
             </div>
         );
